@@ -1,10 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -13,6 +13,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/nikoksr/notify"
+	"github.com/nikoksr/notify/service/discord"
 )
 
 type Coinmarketcap struct {
@@ -53,7 +55,8 @@ func initDb() (db *sqlx.DB) {
 	)
 	db, err := sqlx.Connect("postgres", DbUrl)
 	if err != nil {
-		log.Fatal(err)
+		sendNotification(err)
+		panic(err.Error())
 	}
 	return db
 }
@@ -65,7 +68,8 @@ func extractFromCmc(starting string) (body []byte) {
 		nil,
 	)
 	if err != nil {
-		log.Fatal(err)
+		sendNotification(err)
+		panic(err.Error())
 	}
 	q := req.URL.Query()
 	q.Add("start", starting)
@@ -83,12 +87,14 @@ func extractFromCmc(starting string) (body []byte) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		sendNotification(err)
+		panic(err.Error())
 	}
 	defer resp.Body.Close()
 	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		sendNotification(err)
+		panic(err.Error())
 	}
 	return body
 }
@@ -96,7 +102,8 @@ func extractFromCmc(starting string) (body []byte) {
 func processBodyIntoStruct(body []byte) (cmc Coinmarketcap) {
 	err := json.Unmarshal(body, &cmc)
 	if err != nil {
-		log.Fatal(err)
+		sendNotification(err)
+		panic(err.Error())
 	}
 	return
 }
@@ -124,7 +131,8 @@ func pushCoinsIntoDb(cmc Coinmarketcap) {
 
 	_, err := Db.Exec(smt, valueArgs...)
 	if err != nil {
-		log.Fatal(err)
+		sendNotification(err)
+		panic(err.Error())
 	}
 }
 
@@ -151,7 +159,8 @@ func pushPricesIntoDb(cmc Coinmarketcap) {
 	)
 	_, err := Db.Exec(prices_smt, valueArgs...)
 	if err != nil {
-		log.Fatal(err)
+		sendNotification(err)
+		panic(err.Error())
 	}
 	last_prices_smt := `
 		INSERT INTO lastprices (updatedat, coinid, price)
@@ -166,6 +175,20 @@ func pushPricesIntoDb(cmc Coinmarketcap) {
 	)
 	_, err = Db.Exec(last_prices_smt, valueArgs...)
 	if err != nil {
-		log.Fatal(err)
+		sendNotification(err)
+		panic(err.Error())
 	}
+}
+
+func sendNotification(recevedErr error) {
+	discordService := discord.New()
+	_ = discordService.AuthenticateWithBotToken(os.Getenv("DISCORD_BOT_ID"))
+	discordService.AddReceivers(os.Getenv("DISCORD_CHANNEL_CMC"))
+	notifier := notify.New()
+	notifier.UseServices(discordService)
+	_ = notifier.Send(
+		context.Background(),
+		"**Error CMC Data extract**",
+		recevedErr.Error(),
+	)
 }
