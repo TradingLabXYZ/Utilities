@@ -1,4 +1,4 @@
-# Set env var
+# How to set env var
 
 ```
 export TL_DB_USER=
