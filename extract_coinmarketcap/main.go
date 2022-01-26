@@ -42,7 +42,6 @@ func main() {
 		pushCoinsIntoDb(cmc)
 		pushPricesIntoDb(cmc)
 	}
-	sendNotification("**success**", "EXTRACTIN COMPLETE")
 }
 
 func initDb() (db *sqlx.DB) {
