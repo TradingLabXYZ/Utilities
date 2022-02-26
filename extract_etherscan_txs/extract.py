@@ -1,8 +1,12 @@
+import time
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 
-def main():
-    with open("tx.html") as fp:
-        soup = BeautifulSoup(fp, "html.parser")
+def parse_txs(html):
+    soup = BeautifulSoup(html, "html.parser")
     timestamp = extract_timestamp(soup)
     swaps = extract_swap(timestamp, soup)
     print(swaps)
@@ -79,5 +83,20 @@ def replace_month(timestamp):
         timestamp = timestamp.replace(month, months[month])
     return timestamp
 
+
 if __name__ == "__main__":
-    main()
+    driver = webdriver.Chrome(ChromeDriverManager().install())
+    driver.get("https://etherscan.io/tokentxns?a=0xd12d8b2f0480bf87d75a2559a397f486ed8eb026")
+    time.sleep(3)
+    temp_links = driver.find_elements(By.TAG_NAME, "a")
+    links = []
+    for link in temp_links:
+        raw_link = str(link.get_attribute("href"))
+        if "/tx/" in raw_link:
+            links.append(raw_link)
+    for link in links:
+        print("\n", link)
+        driver.get(link)
+        time.sleep(3)
+        parse_txs(driver.page_source)
+    driver.quit()
