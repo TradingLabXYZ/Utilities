@@ -6,7 +6,7 @@ from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 
-address = "0x1317c62f99bde9bf41dcc0381b5cad04cdd50bf2"
+address = "0xd374388b8235651fad32f04e1400783c0781bcc9"
 pages = 1
 
 def extract_links(driver):
@@ -16,7 +16,7 @@ def extract_links(driver):
         temp_tx_url = tx_url.format(address, str(page + 1))
         print("Extracting", temp_tx_url, "...") 
         driver.get(temp_tx_url)
-        time.sleep(3)
+        time.sleep(1)
         temp_links = driver.find_elements(By.TAG_NAME, "a")
         for link in temp_links:
             raw_link = str(link.get_attribute("href"))
@@ -27,11 +27,10 @@ def extract_links(driver):
 def extract_txs(driver, links):
     txs = []
     for link in links:
-        print("\Analyzing", link, "...") 
+        print("\tAnalyzing", link, "...") 
         driver.get(link)
         time.sleep(3)
         tx = parse_tx(driver.page_source)
-        print(tx)
         txs.append(tx)
     return txs
 
@@ -52,29 +51,36 @@ def extract_timestamp(soup):
 
 def extract_tx_info(timestamp, soup):
     info_details = get_info_from_soup(soup)
-    if info_details[0][0] == "Swap":
-        info_details = merge_swaps(info_details)
-        info_details = clean_swaps(timestamp, info_details)
-    if info_details[0][0] in ["liquidity", "Remove", "Add"]:
-        info_details = clean_liquidity(timestamp, info_details)
-    if info_details[0][0] == "From":
-        info_details = clean_transfer(timestamp, info_details)
+    if info_details:
+        if info_details[0][0] == "Swap":
+            info_details = merge_swaps(info_details)
+            info_details = clean_swaps(timestamp, info_details)
+        if info_details[0][0] in ["liquidity", "Remove", "Add"]:
+            info_details = clean_liquidity(timestamp, info_details)
+        if info_details[0][0] == "From":
+            info_details = clean_transfer(timestamp, info_details)
     return info_details
 
 def get_info_from_soup(soup):
     info_details = []
-    div_sections = soup.find_all("div", {"class": "col-md-9"})
+    div_sections = soup.find_all("div", {"class": ["row", "mb-4"]})
     for div_section in div_sections:
-        div_infos = div_section.find_all("div", {"class": "media-body"})
-        for div_info in div_infos:
-            temp_info_details = []
-            if div_info:
-                spans_info = div_info.find_all(["span", "img", "a"])
-                for span_info in spans_info:
-                    if span_info.text:
-                        temp_info_details.append(span_info.text.strip())
-            if temp_info_details[0] in ["Swap", "liquidity", "Remove", "Add", "From"]:
-                info_details.append(temp_info_details)
+        div_check = div_section.find("div", {"class": "col-md-3"})
+        if div_check:
+            if "Transaction Action" in div_check.text.strip():
+                div_sections = div_section.find_all("div", {"class": "col-md-9"})
+                for div_section in div_sections:
+                    div_infos = div_section.find_all("div", {"class": "media-body"})
+                    for div_info in div_infos:
+                        temp_info_details = []
+                        if div_info:
+                            spans_info = div_info.find_all(["span", "img", "a"])
+                            for span_info in spans_info:
+                                if span_info.text:
+                                    temp_info_details.append(span_info.text.strip())
+                        if temp_info_details[0] in ["Swap", "liquidity", "Remove", "Add", "From"]:
+                            info_details.append(temp_info_details)
+                break
     return info_details
 
 def merge_swaps(info_details):
@@ -151,4 +157,7 @@ if __name__ == "__main__":
     links = extract_links(driver)
     txs = extract_txs(driver, links)
     driver.quit()
-    numpy.savetxt('output.csv',a,delimiter=",")
+    with open("output.txt", "a") as output:
+        for tx in txs:
+            for subtx in tx:
+                output.write(";".join(subtx) + "\n")
