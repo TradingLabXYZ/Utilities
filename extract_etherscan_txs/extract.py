@@ -6,17 +6,19 @@ from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 
-address = "0xd374388b8235651fad32f04e1400783c0781bcc9"
+address = "0x3c2c7245793b7e86d4baa5513f8baf8b9e672068"
 pages = 1
+
+s_sleep = 1
 
 def extract_links(driver):
     links = []
     tx_url = "https://etherscan.io/tokentxns?a={0}&p={1}"
     for page in range(pages):
         temp_tx_url = tx_url.format(address, str(page + 1))
-        print("Extracting", temp_tx_url, "...") 
+        print("Extracting", temp_tx_url)
         driver.get(temp_tx_url)
-        time.sleep(1)
+        time.sleep(s_sleep)
         temp_links = driver.find_elements(By.TAG_NAME, "a")
         for link in temp_links:
             raw_link = str(link.get_attribute("href"))
@@ -27,20 +29,26 @@ def extract_links(driver):
 def extract_txs(driver, links):
     txs = []
     for link in links:
-        print("\tAnalyzing", link, "...") 
+        print("\tAnalyzing", link)
         driver.get(link)
-        time.sleep(3)
-        tx = parse_tx(driver.page_source)
+        time.sleep(s_sleep)
+        tx_id = link.split("/")[-1]
+        tx = parse_tx(tx_id, driver.page_source)
         txs.append(tx)
     return txs
 
 
-def parse_tx(html):
+def parse_tx(tx_id, html):
     soup = BeautifulSoup(html, "html.parser")
-    timestamp = extract_timestamp(soup)
-    info = extract_tx_info(timestamp, soup)
-    print("\t\tObtained", info) 
-    return info
+    if "Million (MM)" in str(soup):
+        timestamp = extract_timestamp(soup)
+        infos = extract_tx_info(tx_id, timestamp, soup)
+        for info in infos:
+            print("\t\tObtained", info) 
+        return infos
+    else:
+        print("\t\tNo MM tx")
+        return []
 
 def extract_timestamp(soup):
     div_timestamp = soup.find("div", {"id": "ContentPlaceHolder1_divTimeStamp"})
@@ -49,16 +57,16 @@ def extract_timestamp(soup):
     timestamp = replace_month(timestamp)
     return timestamp.replace(" +UTC", "")
 
-def extract_tx_info(timestamp, soup):
+def extract_tx_info(tx_id, timestamp, soup):
     info_details = get_info_from_soup(soup)
     if info_details:
         if info_details[0][0] == "Swap":
             info_details = merge_swaps(info_details)
-            info_details = clean_swaps(timestamp, info_details)
+            info_details = clean_swaps(tx_id, timestamp, info_details)
         if info_details[0][0] in ["liquidity", "Remove", "Add"]:
-            info_details = clean_liquidity(timestamp, info_details)
+            info_details = clean_liquidity(tx_id, timestamp, info_details)
         if info_details[0][0] == "From":
-            info_details = clean_transfer(timestamp, info_details)
+            info_details = clean_transfer(tx_id, timestamp, info_details)
     return info_details
 
 def get_info_from_soup(soup):
@@ -95,7 +103,7 @@ def merge_swaps(info_details):
         i = i + 1    
     return info_details
 
-def clean_swaps(timestamp, info_details):
+def clean_swaps(tx_id, timestamp, info_details):
     swaps_cleaned = []
     for swap in info_details:
         from_qty = swap[2]
@@ -103,11 +111,11 @@ def clean_swaps(timestamp, info_details):
         to_qty = swap[-4]
         to_pair = swap[-3]
         swaps_cleaned.append([
-            timestamp, "Swap", from_qty, from_pair, to_qty, to_pair
+            tx_id, timestamp, "Swap", from_qty, from_pair, to_qty, to_pair
         ])
     return swaps_cleaned
 
-def clean_liquidity(timestamp, info_details):
+def clean_liquidity(tx_id, timestamp, info_details):
     liquidity_cleaned = []
     for liquidity in info_details:
         tx_type = liquidity[0]
@@ -116,11 +124,11 @@ def clean_liquidity(timestamp, info_details):
         qty2 = liquidity[4]
         pair2 = liquidity[5]
         liquidity_cleaned.append([
-            timestamp, tx_type, qty1, pair1, qty2, pair2
+            tx_id, timestamp, tx_type, qty1, pair1, qty2, pair2
         ])
     return liquidity_cleaned
 
-def clean_transfer(timestamp, info_details):
+def clean_transfer(tx_id, timestamp, info_details):
     transfer_cleaned = []
     for transfer in info_details:
         tx_type = "Transfer"
@@ -129,7 +137,7 @@ def clean_transfer(timestamp, info_details):
         qty = transfer[9]
         pair = transfer[11]
         transfer_cleaned.append([
-            timestamp, tx_type, from_add, to_add, qty, pair
+            tx_id, timestamp, tx_type, from_add, to_add, qty, pair
         ])
     return transfer_cleaned
 
@@ -157,7 +165,7 @@ if __name__ == "__main__":
     links = extract_links(driver)
     txs = extract_txs(driver, links)
     driver.quit()
-    with open("output.txt", "a") as output:
+    with open(address + ".txt", "a") as output:
         for tx in txs:
             for subtx in tx:
                 output.write(";".join(subtx) + "\n")
