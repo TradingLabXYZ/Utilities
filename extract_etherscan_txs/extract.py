@@ -6,8 +6,8 @@ from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 
-address = "0x3c2c7245793b7e86d4baa5513f8baf8b9e672068"
-pages = 1
+address = "0xd59afec43e79257bf580c4ac9f790ca8c632e327"
+pages = 3
 
 s_sleep = 1
 
