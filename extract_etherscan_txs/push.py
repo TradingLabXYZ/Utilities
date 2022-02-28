@@ -28,6 +28,10 @@ df_recap = pd.read_csv(
     names=["txid", "date", "type", "qty_sell", "pair_sell", "qty_buy", "pair_buy"]
 )
 df_recap = df_recap.sort_values(by=["date"], ascending=False)
+df_recap["qty_sell"] = df_recap["qty_sell"].str.replace(",", "")
+df_recap["qty_buy"] = df_recap["qty_buy"].str.replace(",", "")
+df_recap["qty_sell"] = df_recap["qty_sell"].astype(float)
+df_recap["qty_buy"] = df_recap["qty_buy"].astype(float)
 df_recap["price"] = df_recap.qty_sell / df_recap.qty_buy
 
 query_user = """
