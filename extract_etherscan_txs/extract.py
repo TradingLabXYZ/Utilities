@@ -6,10 +6,20 @@ from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 
-address = "0xd59afec43e79257bf580c4ac9f790ca8c632e327"
-pages = 3
+address = "0x245b97e2d5f68234b752ee001de381208f9e186f"
+pages = 2
 
 s_sleep = 1
+
+def main():
+    driver = webdriver.Chrome(ChromeDriverManager().install())
+    links = extract_links(driver)
+    txs = extract_txs(driver, links)
+    driver.quit()
+    with open(address + ".txt", "a") as output:
+        for tx in txs:
+            for subtx in tx:
+                output.write(";".join(subtx) + "\n")
 
 def extract_links(driver):
     links = []
@@ -28,15 +38,14 @@ def extract_links(driver):
 
 def extract_txs(driver, links):
     txs = []
-    for link in links:
+    for link in set(links):
         print("\tAnalyzing", link)
+        tx_id = link.split("/")[-1]
         driver.get(link)
         time.sleep(s_sleep)
-        tx_id = link.split("/")[-1]
         tx = parse_tx(tx_id, driver.page_source)
         txs.append(tx)
     return txs
-
 
 def parse_tx(tx_id, html):
     soup = BeautifulSoup(html, "html.parser")
@@ -67,7 +76,10 @@ def extract_tx_info(tx_id, timestamp, soup):
             info_details = clean_liquidity(tx_id, timestamp, info_details)
         if info_details[0][0] == "From":
             info_details = clean_transfer(tx_id, timestamp, info_details)
-    return info_details
+    if "For" in sum(info_details, []): # Delete bots
+        return []
+    else:
+        return info_details
 
 def get_info_from_soup(soup):
     info_details = []
@@ -161,11 +173,4 @@ def replace_month(timestamp):
     return timestamp
 
 if __name__ == "__main__":
-    driver = webdriver.Chrome(ChromeDriverManager().install())
-    links = extract_links(driver)
-    txs = extract_txs(driver, links)
-    driver.quit()
-    with open(address + ".txt", "a") as output:
-        for tx in txs:
-            for subtx in tx:
-                output.write(";".join(subtx) + "\n")
+    main()
