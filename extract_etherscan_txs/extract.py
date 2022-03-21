@@ -6,8 +6,8 @@ from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 
-address = "0x245b97e2d5f68234b752ee001de381208f9e186f"
-pages = 2
+address = "0xa4f73b08e1af955e021ffe99029d2eae02ac9373"
+pages = 1
 
 s_sleep = 1
 
@@ -16,7 +16,7 @@ def main():
     links = extract_links(driver)
     txs = extract_txs(driver, links)
     driver.quit()
-    with open(address + ".txt", "a") as output:
+    with open(address + ".csv", "a") as output:
         for tx in txs:
             for subtx in tx:
                 output.write(";".join(subtx) + "\n")
@@ -76,10 +76,7 @@ def extract_tx_info(tx_id, timestamp, soup):
             info_details = clean_liquidity(tx_id, timestamp, info_details)
         if info_details[0][0] == "From":
             info_details = clean_transfer(tx_id, timestamp, info_details)
-    if "For" in sum(info_details, []): # Delete bots
-        return []
-    else:
-        return info_details
+    return info_details
 
 def get_info_from_soup(soup):
     info_details = []
